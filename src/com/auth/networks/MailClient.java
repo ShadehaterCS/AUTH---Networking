@@ -3,7 +3,9 @@ package com.auth.networks;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.Scanner;
+import java.util.Vector;
 
 public class MailClient {
     public static void main(String[] args) {
@@ -16,7 +18,9 @@ public class MailClient {
     private Socket socket;
     private Scanner scanner;
 
-    private boolean signedIn;
+    private String currentUsername;
+    private Vector<Email> cachedEmails;
+
     public MailClient() {
         scanner = new Scanner(System.in);
     }
@@ -27,20 +31,29 @@ public class MailClient {
     public void setUpConnection(String host, int port){
         try {
             InetAddress a = InetAddress.getByName(host);
-            socket = new Socket(host, 3000);
+            socket = new Socket(host, port);
 
             outputStream = new ObjectOutputStream(socket.getOutputStream());
             inputStream = new ObjectInputStream(socket.getInputStream());
         } catch (IOException e) {
             e.printStackTrace();
         }
-        signedIn = false;
     }
     public void showMenu() {
         try {
             int selection = -1;
+            System.out.println("Welcome to the AUTH Mail Client. It just works");
             do {
-                System.out.println("THIS WILL BE THE MENU"); //TODO ADD MENU
+                System.out.println("""
+                        1 -> Register
+                        2 -> Log In
+                        3 -> Create new email
+                        4 -> See your inbox
+                        5 -> Read an E-mail
+                        6 -> Delete an E-mail
+                        7 -> Log out
+                        8 -> EXIT :(                    
+                        """);
                 selection = Integer.parseInt(scanner.nextLine());
 
                 if (selection == 1)
@@ -57,7 +70,7 @@ public class MailClient {
                     deleteEmail();
                 else if (selection == 7)
                     logOut();
-                else { //implicit 8
+                else if (selection == 8){ //implicit 8
                     System.out.println("Thank you for using the AUTH Mail Client. It was built with love");
                     exit();
                     break;
@@ -68,56 +81,132 @@ public class MailClient {
         }
 
     }
-
+ //todo change writeObject to sendRequest method
     public void register() throws IOException, ClassNotFoundException {
         outputStream.writeObject("REGISTER");
-        System.out.println("Enter your username: (domain @csd.auth.gr)will be added automatically");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are already logged in");
+            return;
+        }
+        System.out.println("Enter your username: ");
         outputStream.writeObject(scanner.nextLine());
-        if ((Integer)inputStream.readObject() == -1) {
+        System.out.println("Enter your password: ");
+        outputStream.writeObject(scanner.nextLine());
+
+        if ((Integer) inputStream.readObject() == -1) {
             System.err.println("Username already exists");
             return;
         }
-        System.out.println("Enter your password: ");
-        outputStream.writeObject(scanner.nextLine().hashCode()); //.hashcode because we're good like that
 
         System.out.println("Account registered successfully, you can now log in");
     }
 
-    public void login() {
-        if (signedIn) {
-            System.out.println("You are already signed in");
+    public void login() throws Exception{
+        outputStream.writeObject("LOGIN");
+        if ((Integer) inputStream.readObject() == 100){
+            System.err.println("You are already logged in");
             return;
+        }
+        String[] packet = new String[2];
+        System.out.println("Please enter your email address: ");
+        String username = scanner.nextLine();
+        System.out.println("Please enter your password: ");
+        String password = scanner.nextLine();
+        //password = String.valueOf(password.hashCode());
+        outputStream.writeObject(username);
+        outputStream.writeObject(password);
+        //Get response if username and password are correct
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("Wrong username or password");
+            return;
+        }
+        System.out.println("Log in successful");
+        currentUsername = username;
+    }
+
+    public void newEmail() throws Exception {
+        outputStream.writeObject("NEW-EMAIL");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are not currently logged in");
+            return;
+        }
+        System.out.println("Please enter the recipient's email address");
+        String recipientUsername = scanner.nextLine();
+        outputStream.writeObject(recipientUsername);
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("No such email address exists");
+            return;
+        }
+        //recipient exists
+        System.out.println("Please enter a subject: ");
+        String subject = scanner.nextLine();
+        System.out.println("Please type your message: ");
+        String message = scanner.nextLine();
+        Email email = new Email(subject, message, currentUsername, recipientUsername, LocalDateTime.now().toString());
+        outputStream.writeObject(email);
+        System.out.println("Email sent successfully");
+    }
+
+    /*
+    Sync the inbox with the server every time it's called
+     */
+    public void showEmails() throws Exception{
+        outputStream.writeObject("INBOX");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are not currently logged in");
+            return;
+        }
+        cachedEmails = (Vector<Email>) inputStream.readObject();
+        if (cachedEmails.size() == 0)
+            System.out.println("No emails in your inbox");
+        int i=0;
+        for (Email e : cachedEmails){
+            System.out.println("ID:\n" + i++ + " " + e.toStringCondensed());
         }
     }
 
-    public void newEmail() {
+    /*
+    Uses the cached emails, showEmails() should be called to resync
+    */
+    public void readEmail() throws Exception{
+        outputStream.writeObject("READ-EMAIL");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are not currently logged in");
+            return;
+        }
+        System.out.println("Please enter the id of the email you'd like to read: ");
+        int index = Integer.parseInt(scanner.nextLine());
+        if (cachedEmails == null || index > cachedEmails.size()-1 || index < 0){
+            System.err.println("Invalid id selected");
+            outputStream.writeObject(-1);
+            return;
+        }
+        Email selected = cachedEmails.elementAt(index);
+        selected.read();
+        System.out.println(selected.toString());
+
+        outputStream.writeObject(index);
+    }
+
+    public void deleteEmail() throws Exception{
 
     }
 
-    public void showEmails() {
-
-    }
-
-    public void readEmail() {
-
-    }
-
-    public void deleteEmail() {
-
-    }
-
-    public void logOut() {
+    public void logOut() throws Exception{
 
     }
 
     public void exit() {
         System.out.println("Exiting");
         try {
+            outputStream.writeObject("EXIT");
             inputStream.close();
             outputStream.close();
             socket.close();
+            System.exit(0);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 }
