@@ -19,7 +19,6 @@ public class MailClient {
     private Scanner scanner;
 
     private String currentUsername;
-    private Vector<Email> cachedEmails;
 
     public MailClient() {
         scanner = new Scanner(System.in);
@@ -134,7 +133,7 @@ public class MailClient {
         String recipientUsername = scanner.nextLine();
         outputStream.writeObject(recipientUsername);
         if ((Integer) inputStream.readObject() == -1){
-            System.err.println("No such email address exists");
+            System.out.println("No such email address exists");
             return;
         }
         //recipient exists
@@ -156,7 +155,8 @@ public class MailClient {
             System.err.println("You are not currently logged in");
             return;
         }
-        cachedEmails = (Vector<Email>) inputStream.readObject();
+        Vector<Email> cachedEmails = (Vector<Email>) inputStream.readObject();
+        System.out.println(cachedEmails.hashCode());
         if (cachedEmails.size() == 0)
             System.out.println("No emails in your inbox");
         int i=0;
@@ -165,15 +165,13 @@ public class MailClient {
         }
     }
 
-    /*
-    Uses the cached emails, showEmails() should be called to resync
-    */
     public void readEmail() throws Exception{
         outputStream.writeObject("READ-EMAIL");
         if ((Integer) inputStream.readObject() == -1){
             System.err.println("You are not currently logged in");
             return;
         }
+        Vector<Email> cachedEmails = (Vector<Email>) inputStream.readObject();
         System.out.println("Please enter the id of the email you'd like to read: ");
         int index = Integer.parseInt(scanner.nextLine());
         if (cachedEmails == null || index > cachedEmails.size()-1 || index < 0){
@@ -189,11 +187,30 @@ public class MailClient {
     }
 
     public void deleteEmail() throws Exception{
-
+        outputStream.writeObject("DELETE-EMAIL");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are not currently logged in");
+            return;
+        }
+        System.out.println("Please enter the id of the email you'd like to delete: ");
+        int index = Integer.parseInt(scanner.nextLine());
+        outputStream.writeObject(index);
+        int response = (Integer)inputStream.readObject();
+        if (response == -1)
+            System.out.println("Wrong input");
+        else
+            System.out.println("E-mail deleted successfully");
     }
 
     public void logOut() throws Exception{
-
+        outputStream.writeObject("LOGOUT");
+        if ((Integer) inputStream.readObject() == -1){
+            System.err.println("You are not currently logged in");
+            return;
+        }
+        if ((Integer) inputStream.readObject() == 0)
+            System.out.println("Logged out of account: "+currentUsername);
+        currentUsername = null;
     }
 
     public void exit() {

@@ -27,7 +27,7 @@ public class Email implements Serializable {
         return recipient;
     }
 
-    public String toString(){
+    public String toString(){ //todo fix the visuals of this
         String readStatus = isNew ? "NEW" : "READ";
         return "READ STATUS:" + readStatus +
                 "\nSender:\t" + sender +
