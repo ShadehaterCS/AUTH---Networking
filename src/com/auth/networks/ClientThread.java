@@ -4,10 +4,12 @@ import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.UUID;
-/*
-    This class is meant to be run in separate threads for each individual client
-    Handles every request from the bound client
-     */
+/**
+ *  A clientThread handles the POST requests from a client
+ *  It binds to a client through the clientSocket and in/output streams
+ *  Every method is mirrored to the client
+ *
+ */
 public class ClientThread extends Thread {
     private final Socket clientSocket;
     private final ObjectInputStream inputStream;
@@ -27,6 +29,11 @@ public class ClientThread extends Thread {
         userLoggedIn = false;
     }
 
+    /**
+     * Infinite loop to wait for the requests
+     * Will break if the client gets disconnected
+     * The thread removes itself from the activeThreads list in MailServer and the
+     */
     @Override
     public void run() {
         String request;
@@ -44,10 +51,7 @@ public class ClientThread extends Thread {
         } catch (Exception e) {
             System.err.println("Client Disconnected");
             e.printStackTrace();
-            synchronized (this) {
-                MailServer.activeConnections--;
-                MailServer.activeThreads.remove(this);
-            }
+            MailServer.disconnectThread(this);
         }
     }
 
@@ -102,6 +106,12 @@ public class ClientThread extends Thread {
         MailServer.log("LOGIN Operation successful for username: "+username);
     }
 
+    /**
+     * @use Gets the Email object from the client and calls the synchronized
+     *      method receiveEmail on the recipient account.
+     *      Synchronization is required because multiple emails from multiple threads could be
+     *      received at the same time.
+     */
     private void newEmailBetweenUsers() throws Exception {
         String recipient = (String) inputStream.readObject();
         if (!MailServer.UsernamesToAccountsMap.containsKey(recipient)) {
