@@ -1,7 +1,6 @@
 package com.auth.networks;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -18,7 +17,6 @@ public class MailServer {
     public static final ConcurrentHashMap<String, Account> UsernamesToAccountsMap = new ConcurrentHashMap<>();
     public static volatile int activeConnections = 0;
     private static int emailsIdCount;
-
 
     private int incrementalID;
 

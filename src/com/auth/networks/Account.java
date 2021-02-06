@@ -8,7 +8,7 @@ public class Account {
     private final String password;
     private final String uid;
 
-    public Account(String userName, String password, String uid){
+    public Account(String userName, String password, String uid) {
         this.userName = userName;
         this.password = password;
         this.uid = uid;
@@ -31,19 +31,20 @@ public class Account {
         return uid;
     }
 
-    public synchronized void receiveEmail(Email email){
+    public synchronized void receiveEmail(Email email) {
         personalEmails.add(email);
     }
 
     public synchronized boolean readEmail(int emailId) {
-        Email email = personalEmails.stream().filter(e-> e.getEmailId() == emailId).findFirst().orElse(null);
-        if (email != null){
+        Email email = personalEmails.stream().filter(e -> e.getEmailId() == emailId).findFirst().orElse(null);
+        if (email != null) {
             email.read();
             return true;
         }
         return false;
     }
+
     public synchronized boolean deleteEmail(int emailId) {
-        return personalEmails.removeIf(e->e.getEmailId() == emailId);
+        return personalEmails.removeIf(e -> e.getEmailId() == emailId);
     }
 }

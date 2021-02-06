@@ -105,6 +105,9 @@ public class MailClient {
         return true;
     }
 
+    /*
+
+    */
     public void signUp() throws Exception {
         if (!POST("SIGNUP"))
             return;
@@ -121,6 +124,9 @@ public class MailClient {
         System.out.println("Account registered successfully, you can now log in");
     }
 
+    /*
+
+    */
     public void login() throws Exception {
         if (!POST("LOGIN"))
             return;
@@ -129,9 +135,9 @@ public class MailClient {
         String username = scanner.nextLine();
         System.out.println("Please enter your password: ");
         String password = scanner.nextLine();
-        //password = String.valueOf(password.hashCode());
+        String hashedPassword = String.valueOf(password.hashCode());
         outputStream.writeObject(username);
-        outputStream.writeObject(password);
+        outputStream.writeObject(hashedPassword);
         //Get response if username and password are correct
         if ((Integer) inputStream.readObject() == -1) {
             System.err.println("Wrong username or password");
