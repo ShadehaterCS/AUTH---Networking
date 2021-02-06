@@ -3,10 +3,10 @@ package com.auth.networks;
 import java.util.Vector;
 
 public class Account {
-    private Vector<Email> personalEmails;
-    private String userName;
-    private String password;
-    private String uid;
+    private final Vector<Email> personalEmails;
+    private final String userName;
+    private final String password;
+    private final String uid;
 
     public Account(String userName, String password, String uid){
         this.userName = userName;

@@ -17,6 +17,8 @@ public class ClientThread extends Thread {
     boolean userLoggedIn;
     public int threadID;
 
+    private Account connectedUserAccount;
+
     public ClientThread(Socket clientSocket, InputStream inputStream, OutputStream outputStream, int id) throws IOException {
         this.clientSocket = clientSocket;
         this.inputStream = new ObjectInputStream(inputStream);
@@ -32,13 +34,12 @@ public class ClientThread extends Thread {
         try {
             while ((request = (String) inputStream.readObject()) != null) {
                 if (!request.isEmpty())
-                    if (!userLoggedIn && (!request.equals("REGISTER") && !request.equals("LOGIN"))) //guarantees a user is logged in
+                    //guarantees a user is logged in, even if the client says so
+                    if (!userLoggedIn && (!request.equals("SIGNUP") && !request.equals("LOGIN")))
                         outputStream.writeObject(-1);
-                    else if (userLoggedIn && request.equals("LOGIN")) //special case
-                        outputStream.writeObject(100);
                     else {
                         outputStream.writeObject(0);
-                        parseRequest(request);
+                        executeRequest(request);
                     }
             }
         } catch (Exception e) {
@@ -48,28 +49,24 @@ public class ClientThread extends Thread {
                 MailServer.activeConnections--;
                 MailServer.activeThreads.remove(this);
             }
-            try {
-                this.join();
-            } catch (InterruptedException interruptedException) {
-                interruptedException.printStackTrace();
-            }
         }
     }
 
-    private void parseRequest(String request) throws Exception {
+    private void executeRequest(String request) throws Exception {
         System.out.println("EXECUTING REQUEST: " + request + " from client with id: " + threadID);
         switch (request) {
-            case "REGISTER" -> registerNewUser();
+            case "SIGNUP" -> userSignUp();
             case "LOGIN" -> userLogin();
-            case "NEW-EMAIL" -> newEmailBetweenUsers();
+            case "COMPOSE" -> newEmailBetweenUsers();
             case "INBOX" -> userInbox();
-            case "READ-EMAIL" -> readEmail();
-            case "DELETE-EMAIL" -> deleteEmail();
+            case "READ" -> readEmail();
+            case "DELETE" -> deleteEmail();
             case "LOGOUT" -> logout();
+            default -> outputStream.writeObject(-1);
         }
     }
 
-    private void registerNewUser() throws Exception {
+    private void userSignUp() throws Exception {
         String username = (String) inputStream.readObject();
         String password = (String) inputStream.readObject();
         int response = 0;
@@ -94,17 +91,19 @@ public class ClientThread extends Thread {
         String password = (String) inputStream.readObject();
         //if the username or password provided is wrong then send a fail code
         if (!MailServer.UsernamesToAccountsMap.containsKey(username)
-        || !MailServer.UsernamesToAccountsMap.get(username).getPassword().equals(password)) {
+                || !MailServer.UsernamesToAccountsMap.get(username).getPassword().equals(password)) {
             outputStream.writeObject(-1);
             return;
         }
         outputStream.writeObject(0);
         connectedUsername = username;
+        connectedUserAccount = MailServer.UsernamesToAccountsMap.get(username);
         userLoggedIn = true;
     }
 
     private void newEmailBetweenUsers() throws Exception {
         String recipient = (String) inputStream.readObject();
+        System.out.println("Got recipient: " + recipient);
         if (!MailServer.UsernamesToAccountsMap.containsKey(recipient)) {
             outputStream.writeObject(-1);
             return;
@@ -115,7 +114,7 @@ public class ClientThread extends Thread {
         recipientAccount.receiveEmail(email);
     }
 
-    private void userInbox() throws Exception{
+    private void userInbox() throws Exception {
         Account acc = MailServer.UsernamesToAccountsMap.get(connectedUsername);
         Vector<Email> emails = acc.getPersonalEmails();
         outputStream.writeObject(emails);
@@ -123,33 +122,48 @@ public class ClientThread extends Thread {
     }
 
     /*
-        Gets an int value from the client
+        Gets an int value from the client that represents the emailId
         If -1 then client tried to read invalid index
-        Synchronizes the associated account's email with read status
+        If emailId is not found that means the client has a stale email collection and has to resync
     */
     private void readEmail() throws Exception {
-        outputStream.writeObject(MailServer.UsernamesToAccountsMap.get(connectedUsername).getPersonalEmails());
         outputStream.reset();
-        int index = (Integer) inputStream.readObject();
-        if (index == -1)
+        int eid = (int) inputStream.readObject();
+        if (eid == -1) {
+            MailServer.log("Canceled READ, user input was bad");
             return;
+        }
         Account acc = MailServer.UsernamesToAccountsMap.get(connectedUsername);
-        acc.getPersonalEmails().elementAt(index).read();
-        System.out.println("Updated e-mail at index: "+ index);
+        Email selected = acc.getPersonalEmails().stream()
+                .filter(e -> e.getEmailId() == eid)
+                .findFirst()
+                .orElse(null);
+        if (selected == null) {
+            MailServer.log("READ Operation failed, email not found in collection. Probably a sync error");
+            return;
+        }
+        selected.read();
     }
 
-    private void deleteEmail() throws Exception{
-        int index = (Integer) inputStream.readObject();
-        Account acc = MailServer.UsernamesToAccountsMap.get(connectedUsername);
-        Vector<Email> emails = acc.getPersonalEmails();
-        if (index < 0 || index >= emails.size())
-            outputStream.writeObject(-1);
-        emails.removeElementAt(index);
-        outputStream.writeObject(0);
-        System.out.println("Deleted e-mail at index: "+ index);
+    /*
+    Handles a client's request to delete an email by its id
+    */
+    private void deleteEmail() throws Exception {
+        int eid = (int) inputStream.readObject();
+        if (eid == -1) {
+            MailServer.log("Canceled DELETE, user input was bad");
+            return;
+        }
+        Vector<Email> emails = connectedUserAccount.getPersonalEmails();
+        boolean removed = emails.removeIf(e -> e.getEmailId() == eid);
+        outputStream.writeObject(removed);
+        if (removed)
+            MailServer.log("DELETE Operation successful with for email-id: "+eid);
+        else
+            MailServer.log("DELETE operation failed for email-id: "+eid);
     }
 
-    private void logout() throws Exception{
+    private void logout() throws Exception {
         connectedUsername = null;
         userLoggedIn = false;
         outputStream.writeObject(0);

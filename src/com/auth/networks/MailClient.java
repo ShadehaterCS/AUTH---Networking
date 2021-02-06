@@ -9,84 +9,105 @@ import java.util.Vector;
 
 public class MailClient {
     public static void main(String[] args) {
-        MailClient client = new MailClient();
-        client.setUpConnection(args[0], Integer.parseInt(args[1]));
-        client.showMenu();
+        try {
+            MailClient client = new MailClient();
+            client.setUpConnection(args[0], Integer.parseInt(args[1]));
+            client.run();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
+
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
     private Socket socket;
-    private Scanner scanner;
-
+    private final Scanner scanner;
     private String currentUsername;
 
+    private Vector<Email> cachedEmails;
     public MailClient() {
         scanner = new Scanner(System.in);
+        currentUsername = null;
     }
 
     /*
     Loop everytime so a user can do stuff
      */
-    public void setUpConnection(String host, int port){
-        try {
-            InetAddress a = InetAddress.getByName(host);
-            socket = new Socket(host, port);
+    public void setUpConnection(String host, int port) throws Exception {
+        InetAddress a = InetAddress.getByName(host);
+        socket = new Socket(host, port);
+        outputStream = new ObjectOutputStream(socket.getOutputStream());
+        inputStream = new ObjectInputStream(socket.getInputStream());
+        cachedEmails = null;
+    }
 
-            outputStream = new ObjectOutputStream(socket.getOutputStream());
-            inputStream = new ObjectInputStream(socket.getInputStream());
-        } catch (IOException e) {
-            e.printStackTrace();
+    public void run() throws Exception{
+        while(true){
+            if (currentUsername == null)
+                showLandingMenu();
+            else
+                showConnectedMenu();
         }
     }
-    public void showMenu() {
-        try {
-            int selection = -1;
-            System.out.println("Welcome to the AUTH Mail Client. It just works");
-            do {
-                System.out.println("""
-                        1 -> Register
+
+    private void showLandingMenu() throws Exception {
+        System.out.println("""
+                =================
+                MAIL SERVER
+                =================""");
+        System.out.println("""
+                        CONNECTED AS GUEST
+                        1 -> Sign Up
                         2 -> Log In
-                        3 -> Create new email
-                        4 -> See your inbox
-                        5 -> Read an E-mail
-                        6 -> Delete an E-mail
-                        7 -> Log out
-                        8 -> EXIT :(                    
+                        3 -> EXIT :(                    
                         """);
-                selection = Integer.parseInt(scanner.nextLine());
-
-                if (selection == 1)
-                    register();
-                else if (selection == 2)
-                    login();
-                else if (selection == 3)
-                    newEmail();
-                else if (selection == 4)
-                    showEmails();
-                else if (selection == 5)
-                    readEmail();
-                else if (selection == 6)
-                    deleteEmail();
-                else if (selection == 7)
-                    logOut();
-                else if (selection == 8){ //implicit 8
-                    System.out.println("Thank you for using the AUTH Mail Client. It was built with love");
-                    exit();
-                    break;
-                }
-            } while (true);
-        }catch (Exception e){
-            e.printStackTrace();
+        int selection = Integer.parseInt(scanner.nextLine());
+        switch (selection){
+            case 1 -> signUp();
+            case 2 -> login();
+            case 3 -> exit();
+            default -> System.out.println("Wrong input");
         }
-
     }
- //todo change writeObject to sendRequest method
-    public void register() throws IOException, ClassNotFoundException {
-        outputStream.writeObject("REGISTER");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are already logged in");
-            return;
+
+    private void showConnectedMenu() throws Exception{
+        System.out.println("""
+                =================
+                MAIL SERVER
+                =================""");
+        System.out.printf("""
+                CONNECTED AS %s
+                1 -> Compose New Email
+                2 -> Inbox
+                3 -> Read an Email
+                4 -> Delete an Email
+                5 -> Log out       
+                6 -> Exit :(
+                """,currentUsername);
+        int selection = Integer.parseInt(scanner.nextLine());
+        switch (selection){
+            case 1-> compose();
+            case 2 -> inbox();
+            case 3-> readEmail();
+            case 4-> deleteEmail();
+            case 5 -> logOut();
+            case 6 -> exit();
         }
+    }
+
+    private boolean POST(String request) throws Exception{
+        outputStream.writeObject(request);
+        int response = (Integer) inputStream.readObject();
+        if (response == -1) {
+            System.err.println("You are already logged in");
+            return false;
+        }
+        return true;
+    }
+
+    public void signUp() throws Exception {
+        if (!POST("SIGNUP"))
+            return;
         System.out.println("Enter your username: ");
         outputStream.writeObject(scanner.nextLine());
         System.out.println("Enter your password: ");
@@ -100,12 +121,9 @@ public class MailClient {
         System.out.println("Account registered successfully, you can now log in");
     }
 
-    public void login() throws Exception{
-        outputStream.writeObject("LOGIN");
-        if ((Integer) inputStream.readObject() == 100){
-            System.err.println("You are already logged in");
+    public void login() throws Exception {
+        if (!POST("LOGIN"))
             return;
-        }
         String[] packet = new String[2];
         System.out.println("Please enter your email address: ");
         String username = scanner.nextLine();
@@ -115,7 +133,7 @@ public class MailClient {
         outputStream.writeObject(username);
         outputStream.writeObject(password);
         //Get response if username and password are correct
-        if ((Integer) inputStream.readObject() == -1){
+        if ((Integer) inputStream.readObject() == -1) {
             System.err.println("Wrong username or password");
             return;
         }
@@ -123,19 +141,14 @@ public class MailClient {
         currentUsername = username;
     }
 
-    public void newEmail() throws Exception {
-        outputStream.writeObject("NEW-EMAIL");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are not currently logged in");
+    public void compose() throws Exception {
+        if (!POST("COMPOSE"))
             return;
-        }
-        System.out.println("Please enter the recipient's email address");
+        System.out.println("Please enter the recipient's email address: ");
         String recipientUsername = scanner.nextLine();
+        System.out.println(recipientUsername);
         outputStream.writeObject(recipientUsername);
-        if ((Integer) inputStream.readObject() == -1){
-            System.out.println("No such email address exists");
-            return;
-        }
+        inputStream.readObject();
         //recipient exists
         System.out.println("Please enter a subject: ");
         String subject = scanner.nextLine();
@@ -149,74 +162,83 @@ public class MailClient {
     /*
     Sync the inbox with the server every time it's called
      */
-    public void showEmails() throws Exception{
-        outputStream.writeObject("INBOX");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are not currently logged in");
+    public void inbox() throws Exception {
+        if (!POST("INBOX"))
+            return;
+        cachedEmails = (Vector<Email>) inputStream.readObject();
+        if (cachedEmails.size() == 0) {
+            System.out.println("No emails in your inbox");
             return;
         }
-        Vector<Email> cachedEmails = (Vector<Email>) inputStream.readObject();
-        System.out.println(cachedEmails.hashCode());
-        if (cachedEmails.size() == 0)
-            System.out.println("No emails in your inbox");
-        int i=0;
-        for (Email e : cachedEmails){
-            System.out.println("ID:\n" + i++ + " " + e.toStringCondensed());
-        }
+        int i = 1;
+        System.out.println("ID\t\tFROM\t\tSubject");
+        for (Email e : cachedEmails)
+            System.out.println(i++ + e.toStringCondensed());
     }
 
-    public void readEmail() throws Exception{
-        outputStream.writeObject("READ-EMAIL");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are not currently logged in");
+    public void readEmail() throws Exception {
+        if (cachedEmails ==null){
+            System.out.println("Please sync your inbox before trying to read an email");
             return;
         }
-        Vector<Email> cachedEmails = (Vector<Email>) inputStream.readObject();
+        if (!POST("READ"))
+            return;
         System.out.println("Please enter the id of the email you'd like to read: ");
         int index = Integer.parseInt(scanner.nextLine());
-        if (cachedEmails == null || index > cachedEmails.size()-1 || index < 0){
-            System.err.println("Invalid id selected");
+        index = index > 0 && index <= cachedEmails.size() ? index - 1 : -1;
+        if (cachedEmails == null || index == -1) {
             outputStream.writeObject(-1);
             return;
         }
-        Email selected = cachedEmails.elementAt(index);
+        Email selected = cachedEmails.get(index);
+        outputStream.writeObject(selected.getEmailId());
+        System.out.println("STATUS\tFROM\tSubject");
+        System.out.println("------------------------");
         selected.read();
         System.out.println(selected.toString());
-
-        outputStream.writeObject(index);
     }
 
-    public void deleteEmail() throws Exception{
-        outputStream.writeObject("DELETE-EMAIL");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are not currently logged in");
+    public void deleteEmail() throws Exception {
+        if (cachedEmails ==null){
+            System.out.println("Please sync your inbox before trying to read an email");
             return;
         }
+        if (!POST("DELETE"))
+            return;
         System.out.println("Please enter the id of the email you'd like to delete: ");
         int index = Integer.parseInt(scanner.nextLine());
-        outputStream.writeObject(index);
-        int response = (Integer)inputStream.readObject();
-        if (response == -1)
-            System.out.println("Wrong input");
-        else
-            System.out.println("E-mail deleted successfully");
-    }
-
-    public void logOut() throws Exception{
-        outputStream.writeObject("LOGOUT");
-        if ((Integer) inputStream.readObject() == -1){
-            System.err.println("You are not currently logged in");
+        index = index > 0 && index <= cachedEmails.size() ? index - 1 : -1;
+        if (cachedEmails == null || index == -1) {
+            outputStream.writeObject(-1);
             return;
         }
+
+        outputStream.writeObject(cachedEmails.get(index).getEmailId());
+        boolean response = (boolean) inputStream.readObject();
+        if (!response)
+            System.out.println("Delete failed, email not found on server");
+        else{
+            cachedEmails.removeElementAt(index);
+            System.out.println("Deletion successful");
+        }
+    }
+
+    public void logOut() throws Exception {
+        if (!POST("LOGOUT"))
+            return;
         if ((Integer) inputStream.readObject() == 0)
-            System.out.println("Logged out of account: "+currentUsername);
+            System.out.println("Logged out of account: " + currentUsername);
         currentUsername = null;
     }
 
+    /*
+    @use Closes the socket and its streams
+    The server understands when the socket is closed and handles it
+    */
     public void exit() {
+        System.out.println("Thank you for using the AUTH Mail Client. It was built with love");
         System.out.println("Exiting");
         try {
-            outputStream.writeObject("EXIT");
             inputStream.close();
             outputStream.close();
             socket.close();

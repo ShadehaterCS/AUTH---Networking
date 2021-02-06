@@ -9,6 +9,7 @@ public class Email implements Serializable {
     private final String sender;
     private final String recipient;
     private final String timestamp;
+    private final int emailId;
 
     public Email(String subject, String mainBody, String sender, String recipient, String timestamp) {
         this.subject = subject;
@@ -17,6 +18,7 @@ public class Email implements Serializable {
         this.recipient = recipient;
         this.timestamp = timestamp;
         isNew = true;
+        emailId = MailServer.getNewEmailID();
     }
 
     public String getSender() {
@@ -27,22 +29,16 @@ public class Email implements Serializable {
         return recipient;
     }
 
-    public String toString(){ //todo fix the visuals of this
+    public String toString(){
         String readStatus = isNew ? "NEW" : "READ";
-        return "READ STATUS:" + readStatus +
-                "\nSender:\t" + sender +
-                "\nSubject:\t" + subject +
-                "\nContent:\t" + mainBody +
-                "\nTimestamp:\t" + timestamp;
+        return "["+readStatus+"]\t" + sender +"\t"+subject+"\nContent:\n" + mainBody;
     }
 
     public String toStringCondensed(){
         String readStatus = isNew ? "NEW" : "READ";
-        return "READ STATUS:" + readStatus +
-                "\nSender:\t" + sender +
-                "\nSubject:\t" + subject +
-                "\nTimestamp:\t" + timestamp;
+        return " ["+readStatus+"]\t" + sender +"\t"+subject;
     }
 
+    public int getEmailId() { return emailId; }
     public void read(){ isNew = false; }
 }
