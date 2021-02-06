@@ -1,4 +1,4 @@
-package com.auth.networks;
+package main.java.com.auth.networks;
 
 import java.io.*;
 import java.net.InetAddress;

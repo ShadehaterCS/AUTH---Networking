@@ -1,5 +1,4 @@
-package com.auth.networks;
-
+package main.java.com.auth.networks;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -10,7 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MailServer {
     public static void main(String[] args) {
-        MailServer server = new MailServer();
+        int port = Integer.parseInt(args[0]);
+        MailServer server = new MailServer(port);
         server.coldStart();
     }
 
@@ -21,11 +21,12 @@ public class MailServer {
     private static int emailsIdCount;
 
     private int incrementalID;
-
+    private int port;
     private static ArrayList<String> activityLog;
 
-    public MailServer() {
+    public MailServer(int port) {
         incrementalID = 0;
+        this.port = port;
         activityLog = new ArrayList<>();
     }
 
@@ -37,7 +38,7 @@ public class MailServer {
     public void coldStart() {
         try {
             initializeForTesting();
-            ServerSocket serverSocket = new ServerSocket(3000);
+            ServerSocket serverSocket = new ServerSocket(port);
             while (true) {
                 Socket clientSocket;
                 clientSocket = serverSocket.accept();
