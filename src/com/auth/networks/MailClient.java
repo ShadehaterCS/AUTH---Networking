@@ -4,8 +4,8 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Scanner;
-import java.util.Vector;
 
 public class MailClient {
     public static void main(String[] args) {
@@ -24,7 +24,7 @@ public class MailClient {
     private final Scanner scanner;
     private String currentUsername;
 
-    private Vector<Email> cachedEmails;
+    private ArrayList<Email> cachedEmails;
     public MailClient() {
         scanner = new Scanner(System.in);
         currentUsername = null;
@@ -146,9 +146,12 @@ public class MailClient {
             return;
         System.out.println("Please enter the recipient's email address: ");
         String recipientUsername = scanner.nextLine();
-        System.out.println(recipientUsername);
         outputStream.writeObject(recipientUsername);
-        inputStream.readObject();
+        if((int)inputStream.readObject() == -1){
+            System.out.println("Invalid recipient address");
+            return;
+        }
+
         //recipient exists
         System.out.println("Please enter a subject: ");
         String subject = scanner.nextLine();
@@ -165,7 +168,7 @@ public class MailClient {
     public void inbox() throws Exception {
         if (!POST("INBOX"))
             return;
-        cachedEmails = (Vector<Email>) inputStream.readObject();
+        cachedEmails = (ArrayList<Email>) inputStream.readObject();
         if (cachedEmails.size() == 0) {
             System.out.println("No emails in your inbox");
             return;
@@ -212,15 +215,10 @@ public class MailClient {
             outputStream.writeObject(-1);
             return;
         }
-
+        //send email id to the server
         outputStream.writeObject(cachedEmails.get(index).getEmailId());
-        boolean response = (boolean) inputStream.readObject();
-        if (!response)
-            System.out.println("Delete failed, email not found on server");
-        else{
-            cachedEmails.removeElementAt(index);
-            System.out.println("Deletion successful");
-        }
+        cachedEmails.remove(index);
+        System.out.println("Deletion successful");
     }
 
     public void logOut() throws Exception {

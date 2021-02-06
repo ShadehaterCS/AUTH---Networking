@@ -2,9 +2,8 @@ package com.auth.networks;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.UUID;
-import java.util.Vector;
-
 /*
     This class is meant to be run in separate threads for each individual client
     Handles every request from the bound client
@@ -69,17 +68,18 @@ public class ClientThread extends Thread {
     private void userSignUp() throws Exception {
         String username = (String) inputStream.readObject();
         String password = (String) inputStream.readObject();
-        int response = 0;
-        if (MailServer.UsernamesToAccountsMap.containsKey(username)) { //Check if username already exists
-            System.out.println(username + " " + password);
-            response = -1;
-            outputStream.writeObject(response);
+        //Check if username already exists
+        if (MailServer.UsernamesToAccountsMap.containsKey(username)) {
+            outputStream.writeObject(-1);
             return;
         }
-        outputStream.writeObject(response);
+        outputStream.writeObject(0);
         String uniqueID = UUID.randomUUID().toString();
         Account account = new Account(username, password, uniqueID);
-        MailServer.UsernamesToAccountsMap.put(username, account);
+        synchronized (MailServer.UsernamesToAccountsMap) {
+            MailServer.UsernamesToAccountsMap.put(username, account);
+            MailServer.log("SIGNUP Operation successful for username: "+username);
+        }
     }
 
     private void userLogin() throws Exception {
@@ -99,11 +99,11 @@ public class ClientThread extends Thread {
         connectedUsername = username;
         connectedUserAccount = MailServer.UsernamesToAccountsMap.get(username);
         userLoggedIn = true;
+        MailServer.log("LOGIN Operation successful for username: "+username);
     }
 
     private void newEmailBetweenUsers() throws Exception {
         String recipient = (String) inputStream.readObject();
-        System.out.println("Got recipient: " + recipient);
         if (!MailServer.UsernamesToAccountsMap.containsKey(recipient)) {
             outputStream.writeObject(-1);
             return;
@@ -112,13 +112,15 @@ public class ClientThread extends Thread {
         Email email = (Email) inputStream.readObject();
         Account recipientAccount = MailServer.UsernamesToAccountsMap.get(recipient);
         recipientAccount.receiveEmail(email);
+        MailServer.log("COMPOSE Operation successful for : "+ connectedUsername + " -> " + recipient);
     }
 
     private void userInbox() throws Exception {
         Account acc = MailServer.UsernamesToAccountsMap.get(connectedUsername);
-        Vector<Email> emails = acc.getPersonalEmails();
+        ArrayList<Email> emails = acc.getPersonalEmails();
         outputStream.writeObject(emails);
         outputStream.reset();
+        MailServer.log("Sent INBOX to user: "+connectedUsername);
     }
 
     /*
@@ -133,16 +135,11 @@ public class ClientThread extends Thread {
             MailServer.log("Canceled READ, user input was bad");
             return;
         }
-        Account acc = MailServer.UsernamesToAccountsMap.get(connectedUsername);
-        Email selected = acc.getPersonalEmails().stream()
-                .filter(e -> e.getEmailId() == eid)
-                .findFirst()
-                .orElse(null);
-        if (selected == null) {
+        boolean read = connectedUserAccount.readEmail(eid);
+        if (!read)
             MailServer.log("READ Operation failed, email not found in collection. Probably a sync error");
-            return;
-        }
-        selected.read();
+        else
+            MailServer.log("READ Operation successful for email with id: "+eid);
     }
 
     /*
@@ -154,17 +151,16 @@ public class ClientThread extends Thread {
             MailServer.log("Canceled DELETE, user input was bad");
             return;
         }
-        Vector<Email> emails = connectedUserAccount.getPersonalEmails();
-        boolean removed = emails.removeIf(e -> e.getEmailId() == eid);
-        outputStream.writeObject(removed);
+        boolean removed = connectedUserAccount.deleteEmail(eid);
         if (removed)
-            MailServer.log("DELETE Operation successful with for email-id: "+eid);
+            MailServer.log("DELETE Operation successful with for email-id: " + eid);
         else
-            MailServer.log("DELETE operation failed for email-id: "+eid);
+            MailServer.log("DELETE operation failed for email-id: " + eid);
     }
 
     private void logout() throws Exception {
         connectedUsername = null;
+        connectedUserAccount = null;
         userLoggedIn = false;
         outputStream.writeObject(0);
     }

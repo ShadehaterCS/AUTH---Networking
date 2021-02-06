@@ -1,6 +1,7 @@
 package com.auth.networks;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -14,18 +15,23 @@ public class MailServer {
     }
 
     public static ArrayList<Thread> activeThreads = new ArrayList<>();
-    public static ConcurrentHashMap<String, Account> UsernamesToAccountsMap = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<String, Account> UsernamesToAccountsMap = new ConcurrentHashMap<>();
     public static volatile int activeConnections = 0;
     private static int emailsIdCount;
 
+
     private int incrementalID;
+
+    private static ArrayList<String> activityLog;
 
     public MailServer() {
         incrementalID = 0;
+        activityLog = new ArrayList<>();
     }
 
-    public static void log(String s) {
-
+    public static void log(String operationData) {
+        activityLog.add(operationData);
+        System.out.println(operationData);
     }
 
     public void coldStart() {
