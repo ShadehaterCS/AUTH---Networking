@@ -1,4 +1,4 @@
-package main.java.com.auth.networks;
+package com.auth.networks;
 import java.util.ArrayList;
 
 public class Account {

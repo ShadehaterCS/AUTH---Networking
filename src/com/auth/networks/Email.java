@@ -1,7 +1,6 @@
-package main.java.com.auth.networks;
+package com.auth.networks;
 
 import java.io.Serializable;
-
 public class Email implements Serializable {
     boolean isNew;
     private final String subject;

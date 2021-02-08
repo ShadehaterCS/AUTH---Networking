@@ -1,4 +1,5 @@
-package main.java.com.auth.networks;
+package com.auth.networks;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,7 +15,7 @@ public class MailServer {
         server.coldStart();
     }
 
-    public static ArrayList<Thread> activeThreads = new ArrayList<>();
+    public static ArrayList<ClientHandler> activeThreads = new ArrayList<>();
     public static volatile int activeConnections = 0;
 
     public static final ConcurrentHashMap<String, Account> UsernamesToAccountsMap = new ConcurrentHashMap<>();
@@ -39,15 +40,16 @@ public class MailServer {
         try {
             initializeForTesting();
             ServerSocket serverSocket = new ServerSocket(port);
+            System.out.println("Server is online");
             while (true) {
                 Socket clientSocket;
                 clientSocket = serverSocket.accept();
-                Thread clientThread = new ClientThread(clientSocket, clientSocket.getInputStream(),
+                ClientHandler clientHandler = new ClientHandler(clientSocket, clientSocket.getInputStream(),
                         clientSocket.getOutputStream(), incrementalID++);
-                clientThread.start();
-                activeThreads.add(clientThread);
+                clientHandler.start();
+                activeThreads.add(clientHandler);
 
-                System.out.println("New client connected with id: " + activeThreads.indexOf(clientThread));
+                System.out.println("New client connected with id: " + activeThreads.indexOf(clientHandler));
                 System.out.println("---------------------");
             }
         } catch (IOException e) {
@@ -55,7 +57,7 @@ public class MailServer {
         }
     }
 
-    public synchronized static void disconnectThread(Thread t) {
+    public synchronized static void disconnectThread(ClientHandler t) {
         MailServer.activeConnections--;
         MailServer.activeThreads.remove(t);
     }
@@ -86,5 +88,6 @@ public class MailServer {
 
         MailServer.UsernamesToAccountsMap.put("eliaskordoulas@csd.auth.gr", student1);
         MailServer.UsernamesToAccountsMap.put("gregMan@csd.auth.gr", student2);
+        System.out.println("Initial data complete");
     }
 }

@@ -1,4 +1,4 @@
-package main.java.com.auth.networks;
+package com.auth.networks;
 
 import java.io.*;
 import java.net.InetAddress;
@@ -107,7 +107,7 @@ public class MailClient {
 
     /*
 
-    */
+     */
     public void signUp() throws Exception {
         if (!POST("SIGNUP"))
             return;
@@ -126,7 +126,7 @@ public class MailClient {
 
     /*
 
-    */
+     */
     public void login() throws Exception {
         if (!POST("LOGIN"))
             return;

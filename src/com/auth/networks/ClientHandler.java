@@ -1,4 +1,4 @@
-package main.java.com.auth.networks;
+package com.auth.networks;
 
 import java.io.*;
 import java.net.Socket;
@@ -10,17 +10,16 @@ import java.util.UUID;
  *  Every method is mirrored to the client
  *
  */
-public class ClientThread extends Thread {
+public class ClientHandler extends Thread {
     private final Socket clientSocket;
     private final ObjectInputStream inputStream;
     private final ObjectOutputStream outputStream;
     private String connectedUsername;
     boolean userLoggedIn;
     public int threadID;
-
     private Account connectedUserAccount;
 
-    public ClientThread(Socket clientSocket, InputStream inputStream, OutputStream outputStream, int id) throws IOException {
+    public ClientHandler(Socket clientSocket, InputStream inputStream, OutputStream outputStream, int id) throws IOException {
         this.clientSocket = clientSocket;
         this.inputStream = new ObjectInputStream(inputStream);
         this.outputStream = new ObjectOutputStream(outputStream);
@@ -50,8 +49,13 @@ public class ClientThread extends Thread {
             }
         } catch (Exception e) {
             System.err.println("Client Disconnected");
-            e.printStackTrace();
-            MailServer.disconnectThread(this);
+            System.out.println("Killing thread");
+            try{
+                inputStream.close();
+                outputStream.close();
+                clientSocket.close();
+                MailServer.disconnectThread(this);
+            }catch (IOException f){ f.printStackTrace();}
         }
     }
 
